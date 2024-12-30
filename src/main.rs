@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs::File};
 use std::{env, fs};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::prelude::*;
 use rouille::{Request, Response};
 use serde_derive::{Deserialize, Serialize};
@@ -70,8 +70,10 @@ fn fetch_youtube_video_data(video_id: &str) -> Result<YoutubeVideo> {
         .arg("--dump-json")
         .arg(format!("https://www.youtube.com/watch?v={video_id}"))
         .stdout(Stdio::piped())
-        .spawn()?;
-    let json: YtDlpJson = serde_json::from_reader(child.stdout.take().unwrap())?;
+        .spawn()
+        .context("failed to start yt-dlp; make sure it is installed")?;
+    let json: YtDlpJson = serde_json::from_reader(child.stdout.take().unwrap())
+        .context("failed to parse yt-dlp JSON")?;
     if !child.wait()?.success() {
         bail!("yt-dlp returned non-zero exit status");
     }
@@ -120,8 +122,10 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
     // Fetch feed from youtube.
     let feed_xml = attohttpc::get("https://www.youtube.com/feeds/videos.xml")
         .param("channel_id", &feed_id)
-        .send()?;
-    let mut feed = xmltree::Element::parse(feed_xml)?;
+        .send()
+        .context("failed to fetch RSS feed from YouTube")?;
+    let mut feed =
+        xmltree::Element::parse(feed_xml).context("failed to parse RSS feed from YouTube")?;
 
     // Take all the entries from the feed, and collect (some of) them in modified form.
     let mut entries = vec![];
@@ -165,7 +169,7 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
     }
 
     // Store cached state.
-    store_state(state)?;
+    store_state(state).context("failed to store persistent state")?;
 
     // Turn this into XML again.
     let mut output: Vec<u8> = vec![];
@@ -175,7 +179,8 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
             perform_indent: true,
             ..Default::default()
         },
-    )?;
+    )
+    .context("failed to serialize adjusted RSS feed")?;
 
     Ok(Response::from_data("text/xml", output))
 }
@@ -184,7 +189,9 @@ fn main() -> Result<()> {
     let state_file = env::args()
         .nth(1)
         .ok_or_else(|| anyhow!("state file name must be passed as first argument"))?;
-    let state = Arc::new(Mutex::new(load_state(state_file)?));
+    let state = Arc::new(Mutex::new(
+        load_state(state_file).context("failed to load persistent state")?,
+    ));
     rouille::start_server("127.0.0.1:12380", move |request: &Request| {
         let response = match &*request.url() {
             "/www.youtube.com/feeds/videos.xml" => handle_youtube_feed(&state, request),
