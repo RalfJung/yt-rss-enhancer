@@ -4,6 +4,12 @@ This is a proxy that enhances YouTube RSS feeds in the following ways:
 - Add the length of the video to the video title.
 - Remove shorts.
 
+## Prerequisites
+
+yt-rss-enhancer is written in Rust, so to install it you need to have a recent Rust compiler installed.
+To fetch YouTube video metadata, we use [yt-dlp](https://github.com/yt-dlp/yt-dlp), which must also be installed.
+If metadata fetching fails, it is likely that yt-dlp needs to be updated.
+
 ## Setup
 
 This guide assumes that you have Rust installed via rustup, and checked out the sources of this
