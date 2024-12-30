@@ -1,8 +1,8 @@
-use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fs::File};
+use std::{env, fs};
 
 use anyhow::{anyhow, bail, Result};
 use chrono::prelude::*;
@@ -30,17 +30,20 @@ struct State {
     /// Whether the state changed and should be written back to persistent storage soon.
     #[serde(skip)]
     dirty: bool,
+    /// The filename where the state is stored.
+    #[serde(skip)]
+    file: String,
 }
 
-const STATE_FILE: &str = "state.json";
-
-fn load_state() -> Result<State> {
-    Ok(if fs::exists(STATE_FILE).unwrap_or(false) {
-        let f = File::open(STATE_FILE)?;
+fn load_state(state_file: String) -> Result<State> {
+    let mut state = if fs::exists(&state_file).unwrap_or(false) {
+        let f = File::open(&state_file)?;
         serde_json::from_reader(BufReader::new(f))?
     } else {
         State::default()
-    })
+    };
+    state.file = state_file;
+    Ok(state)
 }
 
 fn store_state(state: &Arc<Mutex<State>>) -> Result<()> {
@@ -51,7 +54,7 @@ fn store_state(state: &Arc<Mutex<State>>) -> Result<()> {
         // Nothing to do.
         return Ok(());
     }
-    let f = File::create(STATE_FILE)?;
+    let f = File::create(&state.file)?;
     serde_json::to_writer_pretty(BufWriter::new(f), &*state)?;
     Ok(())
 }
@@ -179,7 +182,10 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
 }
 
 fn main() -> Result<()> {
-    let state = Arc::new(Mutex::new(load_state()?));
+    let state_file = env::args()
+        .nth(1)
+        .ok_or_else(|| anyhow!("state file name must be passed as first argument"))?;
+    let state = Arc::new(Mutex::new(load_state(state_file)?));
     rouille::start_server("127.0.0.1:12380", move |request: &Request| {
         let response = match &*request.url() {
             "/www.youtube.com/feeds/videos.xml" => handle_youtube_feed(&state, request),
