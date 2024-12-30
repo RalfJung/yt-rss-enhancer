@@ -20,8 +20,6 @@ struct YoutubeVideo {
     length: u64,
     /// Is this a short?
     is_short: bool,
-    /// Video title.
-    title: String,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -63,7 +61,6 @@ fn fetch_youtube_video_data(video_id: &str) -> Result<YoutubeVideo> {
     #[derive(Deserialize)]
     struct YtDlpJson {
         duration: u64,
-        title: String,
         width: u64,
         height: u64,
     }
@@ -85,7 +82,6 @@ fn fetch_youtube_video_data(video_id: &str) -> Result<YoutubeVideo> {
         timestamp: Utc::now(),
         length: json.duration,
         is_short,
-        title: json.title,
     })
 }
 
@@ -135,6 +131,10 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
             .get_child("videoId")
             .and_then(|e| e.get_text())
             .ok_or_else(|| anyhow!("videoId element missing"))?;
+        let title = entry
+            .get_child("title")
+            .and_then(|e| e.get_text())
+            .ok_or_else(|| anyhow!("videoId element missing"))?;
         let video_data = get_youtube_video_data(state, &video_id)?;
 
         // Skip shorts.
@@ -145,7 +145,6 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
         // Update title.
         let title = format!(
             "{title} ({duration})",
-            title = video_data.title,
             duration = format_duration(video_data.length)
         );
         let title_elem = entry
