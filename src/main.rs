@@ -89,8 +89,9 @@ fn fetch_youtube_video_data(video_id: &str) -> Result<YoutubeVideo> {
 
 fn get_youtube_video_data(state: &Arc<Mutex<State>>, video_id: &str) -> Result<YoutubeVideo> {
     // Check if we already have the video cached.
-    // TODO: check if the cache is reasonably up-to-date.
     if let Some(video) = state.lock().unwrap().youtube_videos.get(video_id).cloned() {
+        // We assume that size and length of the video generally don't change,
+        // so we can use the cached data.
         return Ok(video);
     }
 
