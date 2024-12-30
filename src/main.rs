@@ -27,6 +27,9 @@ struct YoutubeVideo {
 #[derive(Serialize, Deserialize, Default)]
 struct State {
     youtube_videos: HashMap<VideoId, YoutubeVideo>,
+    /// Whether the state changed and should be written back to persistent storage soon.
+    #[serde(skip)]
+    dirty: bool,
 }
 
 const STATE_FILE: &str = "state.json";
@@ -44,6 +47,10 @@ fn store_state(state: &Arc<Mutex<State>>) -> Result<()> {
     // We deliberately hold the lock around the entire thing, so that no two
     // threads try to write the same file at the same time.
     let state = state.lock().unwrap();
+    if !state.dirty {
+        // Nothing to do.
+        return Ok(());
+    }
     let f = File::create(STATE_FILE)?;
     serde_json::to_writer_pretty(BufWriter::new(f), &*state)?;
     Ok(())
@@ -87,11 +94,12 @@ fn get_youtube_video_data(state: &Arc<Mutex<State>>, video_id: &str) -> Result<Y
     }
 
     let video_data = fetch_youtube_video_data(video_id)?;
+
+    let mut state = state.lock().unwrap();
     state
-        .lock()
-        .unwrap()
         .youtube_videos
         .insert(video_id.to_owned(), video_data.clone());
+    state.dirty = true;
     Ok(video_data)
 }
 
