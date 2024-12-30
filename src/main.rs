@@ -181,6 +181,7 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
         },
     )
     .context("failed to serialize adjusted RSS feed")?;
+    output.push(b'\n'); // trailing newline is nice for testing
 
     Ok(Response::from_data("text/xml", output))
 }
@@ -195,10 +196,10 @@ fn main() -> Result<()> {
     rouille::start_server("127.0.0.1:12380", move |request: &Request| {
         let response = match &*request.url() {
             "/www.youtube.com/feeds/videos.xml" => handle_youtube_feed(&state, request),
-            url => Ok(Response::text(format!("endpoint not found: {url}")).with_status_code(404)),
+            url => Ok(Response::text(format!("endpoint not found: {url}\n")).with_status_code(404)),
         };
         response.unwrap_or_else(|err| {
-            Response::text(format!("internal server error: {err}")).with_status_code(500)
+            Response::text(format!("internal server error: {err}\n")).with_status_code(500)
         })
     });
 }
