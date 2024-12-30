@@ -157,9 +157,8 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
             .ok_or_else(|| anyhow!("title element missing"))?;
         title_elem.children = vec![xmltree::XMLNode::Text(title)];
 
-        // Remove the "media:group" thing, Thunderbird ignores it anyway.
-        while let Some(_) = entry.take_child("group") {}
-        // Also remove "updated" so that the videos keep their original dates.
+        // Remove "updated" so that the videos keep their original dates.
+        // (Thunderbird displays the "updated" date instead of the "published" one.)
         while let Some(_) = entry.take_child("updated") {}
 
         entries.push(entry);
