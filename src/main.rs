@@ -140,6 +140,19 @@ fn handle_youtube_feed(state: &Arc<Mutex<State>>, request: &Request) -> Result<R
             .get_child("title")
             .and_then(|e| e.get_text())
             .ok_or_else(|| anyhow!("videoId element missing"))?;
+        let views = entry
+            .get_child("group")
+            .and_then(|e| e.get_child("community"))
+            .and_then(|e| e.get_child("statistics"))
+            .and_then(|e| e.attributes.get("views"))
+            .ok_or_else(|| anyhow!("views information missing"))?;
+
+        if views == "0" {
+            // Not sure what is up with this, but we saw this for livestreams that haven't happened yet.
+            // Just skip them as the fetching the metadata in the next step would fail.
+            continue;
+        }
+
         let video_data = get_youtube_video_data(state, &video_id)?;
 
         // Skip shorts.
