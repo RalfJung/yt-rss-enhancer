@@ -212,7 +212,7 @@ fn main() -> Result<()> {
             url => Ok(Response::text(format!("endpoint not found: {url}\n")).with_status_code(404)),
         };
         response.unwrap_or_else(|err| {
-            eprintln!("error handling {}: {err}", request.url());
+            eprintln!("error handling {request:?}: {err:?}");
             Response::text(format!("internal server error: {err}\n")).with_status_code(500)
         })
     });
